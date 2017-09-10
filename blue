@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+echo "Unblocking script running"
+var_a=1
+var_b=100
+
+echo "BTUSB unmounted"
+echo "Running ..."
+while [ $var_a -lt 1000 ]
+do
+	sudo rfkill unblock bluetooth
+	((var_a=var_a+1))
+done
+
+echo "BTUSB mounted"
+
+

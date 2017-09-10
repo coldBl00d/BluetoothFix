@@ -1,0 +1,25 @@
+
+echo "Loading unloading script"
+var_a=1
+var_b=100
+
+while [ $var_a -lt 100 ]
+do
+	sudo modprobe -r btusb 
+	((var_a=var_a+1))
+	echo "Unmounting"
+done
+
+var_a=1;
+
+while [ $var_a -lt 100 ]
+do
+        sudo modprobe btusb
+        ((var_a=var_a+1))
+        echo "Mounting"
+done
+
+
+echo "BTUSB mounted"
+
+

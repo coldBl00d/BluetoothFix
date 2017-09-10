@@ -1,0 +1,842 @@
+#!/bin/bash
+
+# *****************************************************************************
+#: Title       : cfu - CPU Frequency Utility                                  *
+#: Date Created: Wed Jun 22 17:03:27 CDT 2011                                 *
+#: Last Edit   : Sun Mar 17 10:08:34 CDT 2013                                 *
+#: Author      : James D. McDaniel                                            *
+#: Version     : 1.23                                                         *
+#: Description : display and set CPU Frequency                                *
+#: Options     : [sudo] cfu [-s #2 #3 #4]                                     *
+#: Notes       : cfu will ask to install cpufrequtils if not installed        *
+# *****************************************************************************
+
+TITLE="CPU Frequency Utility - Version 1.23"
+
+#
+# Written for the openSUSE forums on Sunday March 17, 2013
+#
+
+# *****************************************************************************
+# Copy and Paste the text of this script into a text editor and save 
+# it as the file cfu in the /home area bin folder 
+# example is: /home/username/bin, also known as ~/bin
+# This script must be marked executable to be used.  Please  
+# run the following Terminal command: chmod +x ~/bin/cfu
+# To use cfu, open a terminal session and type in: cfu
+# *****************************************************************************
+
+declare -a governs
+declare -a spdsteps
+
+# *****************************************************************************
+# cfu can create a kde icon if you want. cfu_icon_check=true creates an icon
+# if not there for the KDE desktop. cfu_icon_check=false does not create a  
+# desktop icon. The KDE icon is located/named $HOME/Desktop/C.F.U..desktop.
+# *****************************************************************************
+
+cfu_icon_check=true
+
+# *****************************************************************************
+# cfu can create a kde menu icon if you want. cfu_appl_check=true creates a 
+# appl menu if not there. cfu_appl_check=false does not create a appl menu
+# icon. The cfu_icon_check=true above must be set before an Application menu
+# is create located/named as /usr/share/applications/C.F.U..desktop.
+# *****************************************************************************
+
+cfu_appl_check=true
+
+# ****************************************************************************
+#                          KDE Desktop icon name 
+# ****************************************************************************
+
+kde_icon_name="C.F.U..desktop"
+
+# ****************************************************************************
+#     KDE Desktop icon Location/Name - Look for it in your desktop folder 
+# ****************************************************************************
+
+cfukdeicon="$HOME/Desktop/$kde_icon_name"
+
+# ****************************************************************************
+#   KDE Menu icon Location/Name - Look for it in your kde Applications menu 
+# ****************************************************************************
+
+cfukdeappicon="/usr/share/applications/$kde_icon_name"
+
+# *****************************************************************************
+#                     Start of function blocks here 
+# *****************************************************************************
+
+# *****************************************************************************
+#                 Do you want to see C.F.U. in color?  
+#             The default is true, but can be set to false 
+#           New Escape Sequences work without a Desktop loaded 
+# *****************************************************************************
+
+use_color=true
+
+# *****************************************************************************
+# Color Display Request - color foreground background [b/n] 
+#
+# 0:Black  1:Blue  2:Green  3:Cyan  4:Red  5:Magenta  6:Yellow  7:White
+#
+# Example: color 7 0 B 
+#
+# where foreground is white (7), background is black (0) and text is in bold (B)
+#                           $1                       $2                      $3
+# *****************************************************************************
+
+function color {
+  if $use_color ; then
+    if [[ $3 == [Bb] ]] ; then
+      case "$1" in
+        "0") echo -ne '\E[1;30m' ;;
+        "1") echo -ne '\E[1;34m' ;;
+        "2") echo -ne '\E[1;32m' ;;
+        "3") echo -ne '\E[1;36m' ;;
+        "4") echo -ne '\E[1;31m' ;;
+        "5") echo -ne '\E[1;35m' ;;
+        "6") echo -ne '\E[1;33m' ;;
+        "7") echo -ne '\E[1;37m' ;;
+        *) echo -ne '\E[1;37m' ;;
+      esac
+    else
+      case "$1" in
+        "0") echo -ne '\E[30m' ;;
+        "1") echo -ne '\E[34m' ;;
+        "2") echo -ne '\E[32m' ;;
+        "3") echo -ne '\E[36m' ;;
+        "4") echo -ne '\E[31m' ;;
+        "5") echo -ne '\E[35m' ;;
+        "6") echo -ne '\E[33m' ;;
+        "7") echo -ne '\E[37m' ;;
+        *) echo -ne '\E[37m' ;;
+      esac
+    fi
+    case "$2" in
+      "0") echo -ne '\E[40m' ;;
+      "1") echo -ne '\E[44m' ;;
+      "2") echo -ne '\E[42m' ;;
+      "3") echo -ne '\E[46m' ;;
+      "4") echo -ne '\E[41m' ;;
+      "5") echo -ne '\E[45m' ;;
+      "6") echo -ne '\E[43m' ;;
+      "7") echo -ne '\E[47m' ;;
+      *) echo -ne '\E[40m' ;;
+    esac
+  else
+    echo -ne '\E[37;40m' 
+  fi
+  if [[ $3 == [Nn] ]] ; then
+    tput sgr0
+  fi
+  return 0
+}   
+
+# *****************************************************************************
+#                         Show CFU Display Header
+# *****************************************************************************
+
+function header {
+  dash="----------------------------------------------------------"
+  tput clear
+  color 2 0 B
+  echo $dash
+  color 7 2 B
+  echo "           $TITLE           "
+  color 2 0 B
+  echo $dash
+  color 7 0 B
+  echo 
+  return
+}
+
+# *****************************************************************************
+#                           Show CPU Speed
+# *****************************************************************************
+
+function speed {
+  color 7 0 B
+  echo -n "Governor: "
+  color 5 0 B
+  echo -n "$policy"
+  color 7 0 B
+  echo -n ", CPU Speed: "
+  color 4 0 B
+  echo "$freq"
+  color 7 0 N
+  echo
+  return
+}
+
+# *****************************************************************************
+#                     Display GPL Standard Statement
+# *****************************************************************************
+
+function show_gpl {
+header
+color 2 0 B
+echo "CFU is designed to run the cpufrequtils package in openSUSE."
+echo "Copyright (C) 2011-2013 by James D. McDaniel, jmcdaniel3@austin.rr.com"
+echo
+echo "This program is free software; you can redistribute it and/or modify"
+echo "it under the terms of the GNU General Public License as published by"
+echo "the Free Software Foundation; either version 2 of the License, or"
+echo "(at your option) any later version."
+echo 
+echo "This program is distributed in the hope that it will be useful,"
+echo "but WITHOUT ANY WARRANTY; without even the implied warranty of"
+echo "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the"
+echo "GNU General Public License for more details."
+echo 
+echo "You should have received a copy of the GNU General Public License"
+echo "along with this program; if not, write to the Free Software"
+echo "Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA"
+color 7 0 N
+echo
+}
+
+# *****************************************************************************
+#                     CFU Help Display Function
+# *****************************************************************************
+
+function help {
+  header
+  color 7 1 B
+  echo "  C.F.U. requires no Startup Options, However if you use  "
+  echo "  them your choices are:                                  "
+  color 7 0 B
+  echo 
+  echo "cfu [-h --help] ; shows this help"
+  echo 
+  color 5 0 B 
+  echo "<OR>"
+  color 7 0 B
+  echo
+  echo "cfu [-s #2 #3 [#4]] ; selects CPU speed"
+  echo
+  color 3 0 B
+  echo -n "-s"
+  color 7 0 B
+  echo " = Select Governor"
+  echo
+  color 3 0 B
+  echo -n "#2"
+  color 7 0 B
+  echo " = Governor's per menu options 1 through 5."
+  echo
+  color 3 0 B
+  echo -n "#3"
+  color 7 0 B
+  echo -n " = q to Quit cfu "
+  color 5 0 B
+  echo -n "<OR> "
+  color 3 0 B
+  echo -n "#3"
+  color 7 0 B
+  echo " = userspace Governor speed"
+  echo "     options 1 to max speed number."
+  echo
+  color 3 0 B
+  echo -n "#4"
+  color 7 0 B
+  echo " = q to Quit when Governor was userspace"
+  echo
+  color 3 0 B
+  echo -n "Examples:"
+  color 7 0 B
+  echo -n " [sudo] cfu -s 5 q "
+  color 5 0 B 
+  echo -n "<OR>"
+  color 7 0 B
+  echo " [sudo] cfu -s 2 1 q"
+  echo
+  color 3 0 B
+  echo -n "NOTES:"
+  color 7 0 B
+  echo " To Change your CPU Governor and CPU Speed you" 
+  echo "       need root user authority.  Using C.F.U. requires"
+  echo "       that you have installed the cpufrequtils package."
+  echo
+  color 7 4 B
+  echo -n "Press <enter> to read the GPL Statement for C.F.U.:"
+  read -n1 CHOICE
+  color 7 0 B
+  show_gpl
+  exit 0
+  return
+}
+
+# *****************************************************************************
+#                   Actual C.F.U. KDE icon text file 
+# *****************************************************************************
+
+function create_iconfile {
+
+  iconfile=$1
+  cat >> $iconfile << "EOFTEXT"
+[Desktop Entry]
+Comment[en_US]=CPU Frequency Utility
+Comment=CPU Frequency Utility
+Exec=~/bin/cfu
+GenericName[en_US]=CPU Frequency Utility
+GenericName=CPU Frequency Utility
+Icon=clock
+MimeType=
+Name[en_US]=C.F.U.
+Name=C.F.U.
+Path=
+StartupNotify=true
+Terminal=true
+TerminalOptions=
+Type=Application
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=
+X-SuSE-translate=true
+EOFTEXT
+  return 0
+}
+
+# *****************************************************************************
+#      Check/Create C.F.U. Icon on the KDE Desktop & Menu
+# *****************************************************************************
+
+function deskicon {
+
+  if $cfu_icon_check ; then
+    if [ -e temp.txt ] ; then
+      rm temp.txt
+    fi
+    let de=0
+    which ps 2>&1 > /dev/null 
+    if [ $? -eq 0 ] ; then
+      ps nc -C plasma-desktop >/dev/null &&  let de=1
+      if [ $de -eq 1 ] ; then
+        if [ ! -e $cfukdeicon ] ; then
+          create_iconfile "$cfukdeicon"
+          chmod +x $cfukdeicon
+        fi
+        if $safp_appl_check ; then 
+          if [ ! -e $cfukdeappicon ] ; then
+            create_iconfile "temp.txt"
+            tput clear
+            echo
+            color 7 4 B
+            echo "Root permission is required to create a system icon!"
+            echo
+            echo -n "File Folder/Name: "
+            color 3 0 B
+            echo "$cfukdeappicon"
+            echo
+            color 7 1 B    
+            echo -n "Please Enter the "
+            sudo cp temp.txt $cfukdeappicon
+            sudo chmod +x $cfukdeappicon
+            rm temp.txt
+            color 7 0 B
+          fi
+        fi
+      fi
+    fi
+  fi
+  return 0
+}
+
+# *****************************************************************************
+#                    Display C.F.U. Help if requested.
+# *****************************************************************************
+
+deskicon
+case "$1" in
+    -h|--help) help ;;
+esac
+
+# *****************************************************************************
+#              Determine if cpufreq is supported on this PC
+# *****************************************************************************
+
+if [ $(($(find /sys/devices/system/cpu/cpu*/cpufreq 2>/dev/null | wc -l) + $(ls /sys/devices/system/cpu/cpufreq 2>/dev/null | wc -l))) -eq 0 ] ; then
+  tput clear
+  echo "The cpufreq Utilities will not work on this PC.  Sorry!"
+  echo "You may want to uninstall the cpufrequtils package if installed!"
+  exit 1
+fi
+
+# *****************************************************************************
+#   Find out number of CPU cores, Hyper-threading will double this number
+# *****************************************************************************
+
+threads=$(getconf _NPROCESSORS_ONLN)
+
+# *****************************************************************************
+# Find the brand/model of the CPU in this PC, Determine if Hyper-Threading is supported
+# *****************************************************************************
+
+hyper=false
+if [ -f /proc/cpuinfo ]; then
+  cpuname=$(grep -m 1 "model name" /proc/cpuinfo | cut -d: -f2 | sed -e 's/^ *//' | sed -e 's/$//')
+  cpuname=$(echo "$cpuname" |awk '{$1=$1}1' OFS=" ") # Remove Extra Spaces in $cpuname if they should exist
+  Number_CPUS=$(grep -m 1 "cpu cores" /proc/cpuinfo | cut -d: -f2 | sed -e 's/^ *//' | sed -e 's/$//')
+  if [[ $(cat /proc/cpuinfo) = *siblings* ]] ; then
+    hyperthreads=$(grep -m 1 "siblings" /proc/cpuinfo | cut -d: -f2 | sed -e 's/^ *//' | sed -e 's/$//')
+    if [ $((Number_CPUS)) -lt $((hyperthreads)) ] ; then
+      hyper=true
+    fi
+  fi
+else
+  cpuname="Unknown"
+  Number_CPUS=$threads
+fi
+
+# *****************************************************************************
+#                  Format RAW CPU Speed Display function
+# *****************************************************************************
+
+function form_speed {
+  spd=$1
+  num1=$(((spd) / 1000 ))
+  formed=$(printf "%'d GHz\n" $num1)
+  formed=$(echo $formed | tr ',' '.')
+}
+
+# *****************************************************************************
+# Locate next Substring by space seperator in a long string  
+# Start looking at character position $1 in string $2
+# Return location of next space, between sub-strings
+# *****************************************************************************
+
+function sub_string {
+  counter=$1
+  start=$2
+  num2=${#start}
+  while [ $(( counter )) -lt $(( num2 + 1 )) ] ; do
+  temp="${start:$(($counter)):1}"
+  if [[ $temp != " " ]] ; then
+    let counter=counter+1
+  else
+    return ${counter}
+  fi
+  done
+  return ${counter}
+}
+
+# *****************************************************************************
+# Load Substrings from string, seperated by spaces,
+# into the array ${governs[0]}, using function sub_string
+# $1 is the supplied string to load into ${governs[0]}
+# Return number of sub strings loaded into ${governs[0]}
+# *****************************************************************************
+
+function savegovern {
+savgov=$1
+string=$savgov; string="${string//[^ ]/}"
+let string=${#string}+1
+place=0
+glen=0
+while [[ place -lt string ]] ; do
+  let place=place+1
+  savlst=$((glen))
+  sub_string "$glen" "$savgov"
+  glen="$?"
+  governs[$place]="${savgov:$((savlst)):$((glen-savlst))}"
+
+# format sub-strings if they are raw speeds
+
+  if [ "$ffile" == "true" ] ; then
+    form_speed "${governs[$place]}"
+    governs[$place]="$formed"
+  fi
+
+  let glen=glen+1
+done
+return ${place}
+}
+
+# *****************************************************************************
+# Display All Text in Color as requested
+#
+# syntax: print_color line col fgrd_color bgrd_color #lines "text"...
+# *****************************************************************************
+
+
+function print_color {
+  WIDTH=$(tput cols)
+  HEIGHT=$(tput lines)
+  line_os=0
+  if [ $(($WIDTH)) -le  80  ] ; then
+    col_os=0
+  else
+    col_os=$((($WIDTH - 80) / 2 ))
+  fi
+  s_line=${1}
+  s_col=${2}
+  fgrd=${3}
+  bgrd=${4}
+  maxnum=${5}
+  counter=0
+  while [ $(( counter )) -lt $(( maxnum )) ] ; do
+    tput cup $(( s_line + counter + line_os)) $(( s_col + col_os ))
+    color $fgrd $bgrd B
+    echo -n "${6}$(tput sgr0)"
+    let counter=counter+1
+    shift
+  done
+}
+
+# *****************************************************************************
+#                        Display Main Menu function
+# *****************************************************************************
+
+function main_menu {
+tput clear
+print_color 2 0 7 2 1 "                   $TITLE                    "
+l1="---------------------------------------------------------------------------"
+l2=""
+l3="---------------------------------------------------------------------------"
+print_color 1 0 3 0 3 "$l1" "$l2" "$l3" 
+l1="         CPU Name: $cpuname"
+if $hyper ; then
+  l2="        CPU Cores: $Number_CPUS ($threads with Hyper-Threading)"
+else
+  l2="        CPU Cores: $Number_CPUS"
+fi
+l3="        CPU Speed: $freq" 
+l4="      Speed Range: $lowest to $highest"
+print_color 4 0 7 0 4 "$l1" "$l2" "$l3" "$l4"
+l1="---------------------------------------------------------------------------"
+print_color 8 0 3 0 1 "$l1"
+l1="         Governor: $policy"
+l2="   Your $totopt Options: $govern"
+print_color 9 0 7 0 2 "$l1" "$l2"
+l1="---------------------------------------------------------------------------"
+l2=""
+l3="---------------------------------------------------------------------------"
+print_color 11 0 3 0 3 "$l1" "$l2" "$l3"
+l1=" Please make your selection, S=Set Governor or Q=Quit (S/Q): "
+print_color 12 7 6 1 1 "$l1"
+}
+
+# *****************************************************************************
+#            Set Speed Governor with cpufreq-set for ALL CPU's
+# *****************************************************************************
+
+function govern_set { 
+  countII=0
+  while [[ countII -lt threads ]] ; do
+    sudo cpufreq-set -c $((countII)) -g "$1"
+    let countII=countII+1
+  done
+  sleep 1
+}
+
+# *****************************************************************************
+#    Set CPU speed when governor=userspace with cpufreq-set for ALL CPU's
+# *****************************************************************************
+
+function setfreq {
+  freqset="${spdsteps[$1]}"
+  freqlen=${#freqset}
+  let freqlen=freqlen-4
+  freqset=${freqset:0:$((freqlen))}
+  countII=0
+  while [[ countII -lt threads ]] ; do
+    sudo cpufreq-set -c $((countII)) -f $freqset"GHz"
+    let countII=countII+1
+  done
+  sleep 1
+}
+
+# *****************************************************************************
+# Prepair for install of cpufrequtils if needed by more than one distro
+# The following coding provided by please_try_again
+# *****************************************************************************
+
+# install cpufrequtils under openSUSE, Fedora, Mandriva, Ubuntu
+suselinux="zypper in"
+opensuseproject="zypper in"
+mandrivalinux="urpmi"
+fedora="yum install"
+ubuntu="apt-get install"
+
+# *****************************************************************************
+# default to openSUSE if lsb_release is not found (or write more code to install
+# lsb_release withouth confirmation or get the release name in another way)
+install=suselinux
+which lsb_release &>/dev/null && install=$(lsb_release -is | tr "[:upper:]" "[:lower:]" | tr -d " ")
+install=${!install}
+# *****************************************************************************
+
+# *****************************************************************************
+#            Determine if the package cpufrequtils is installed
+# *****************************************************************************
+
+which cpufreq-info > /dev/null
+Exit_Code=$?
+
+if [ $(( Exit_Code )) -ge 1 ] ; then
+  tput clear
+  echo "The CPU frequency Utilities Package is not installed!"
+  echo
+  echo -n "Would you like to install the cpufrequtils package [y/n] (n)?"
+  read -n1 CHOICE
+  if [[ $CHOICE == [Yy] ]] ; then
+    sudo $install cpufrequtils
+  else
+    exit 1
+  fi
+fi
+
+# *****************************************************************************
+#                        Main Program Starts Here 
+# *****************************************************************************
+
+gui=true
+
+while $gui ; do
+
+# *****************************************************************************
+#             Find Active CPU Speed - cpufreq-info -f
+# *****************************************************************************
+
+  freq=$(cpufreq-info -f)
+  form_speed "$freq"
+  freq=$formed
+
+# *****************************************************************************
+#   Find Lowest Speed / Highest Speed / CPU Speed Policy - cpufreq-info -p
+# *****************************************************************************
+
+  rang=$(cpufreq-info -p)
+  savegovern "$rang"
+
+# *****************************************************************************
+#                            Save Lowest CPU Speed
+# *****************************************************************************
+
+  lowest="${governs[1]}"
+  form_speed "$lowest"
+  lowest=$formed
+
+# *****************************************************************************
+#                            Save Highest CPU Speed
+# *****************************************************************************
+
+  highest="${governs[2]}"
+  form_speed "$highest"
+  highest=$formed
+
+# *****************************************************************************
+#                             Save CPU Speed Policy
+# *****************************************************************************
+
+  policy="${governs[3]}"
+  policy=$(echo $policy | tr '[a-z]' '[A-Z]')
+
+# *****************************************************************************
+# Determine userspace speeds which can be used and load into array
+# *****************************************************************************
+
+# See if scaling_available_frequencies file is present for usage by C.F.U.
+
+  freqfile="/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies"
+
+  if [ ! -e "$freqfile" ] ; then
+
+# Locate Just speed Listing Sub-string for CPU 0 if above file not found
+
+    ffile=false
+    cpuspd=$(cpufreq-info -c 0)
+    cpuspd=${cpuspd%" available cpufreq governors"*}
+    cpuspd=${cpuspd##*" available frequency steps: "}
+
+# Change all spaces to Underscore, Then Change all commas to spaces
+
+    cpuspd=$(echo $cpuspd | tr ' ' '_')
+    cpuspd=$(echo $cpuspd | tr ',' ' ')
+  else
+
+# Translations not required when speed listing file was found
+
+    ffile=true
+    cpuspd=$(cat $freqfile)
+  fi
+
+# Breakup Speeds found into an Array
+
+  savegovern "$cpuspd"
+  totspd="$?"
+
+# Move array values from governs to spdsteps, Change all 
+# Underscores to spaces (if exist), Trim off excess spaces
+
+  ffile=false
+  counter=0
+  while [[ counter -lt totspd ]] ; do
+    let counter=counter+1
+    spdsteps[$counter]=$( echo ${governs[$counter]} | tr '_' ' ')
+    tmpspd=${spdsteps[$counter]}
+    if [ "${tmpspd:0:1}" == " " ] ; then
+      tmpspd="${tmpspd:1:${#tmpspd}-1}"
+      spdsteps[$counter]=$tmpspd
+    fi
+  done
+  if [ "${spdsteps[$totspd]}" == "0 GHz" ] ; then
+    let totspd=totspd-1
+  fi
+
+# *****************************************************************************
+#                  Policy Selections cpufreq-info -g
+# *****************************************************************************
+
+  govern=$(cpufreq-info -g)
+  savegovern "$govern"
+  totopt="$?"
+  govern=$(echo $govern | tr '[a-z]' '[A-Z]')
+  govern=$(echo $govern | tr ' ' ',')
+
+#
+# Show Main Menu and request user input
+#
+
+  main_menu
+
+# Check for Input option menu Automation
+
+  if [ "$1" == "-s" -o "$1" == "-S" ] ; then
+    CHOICE="s"
+    shift
+  else
+    if [ "$1" == "q" -o "$1" == "Q" ] ; then
+      CHOICE="q"
+    else
+      read -n1 CHOICE
+    fi
+  fi
+
+# *****************************************************************************
+#                     CPU Speed Governor Selection 
+# *****************************************************************************
+
+  if [[ $CHOICE == [Ss] ]] ; then
+    header
+    color 7 4 B
+    echo "            CPU Governor Speed Selection Menu:            "
+    color 7 0 B
+    echo
+    color 5 0 B
+    echo -n "CONSERVATIVE"
+    color 7 0 B
+    echo "- Similar to ondemand, but more conservative "
+    echo "(clock speed changes are more graceful)."
+    color 5 0 B
+    echo -n "USERSPACE"
+    color 7 0 B
+    echo "- Manually configured clock speeds by user."
+    color 5 0 B
+    echo -n "POWERSAVE"
+    color 7 0 B
+    echo "- Runs the CPU at minimum speed." 
+    color 5 0 B
+    echo -n "ONDEMAND"
+    color 7 0 B
+    echo "- Dynamically increases/decreases the CPU(s)"
+    echo "clock speed based on system load."
+    color 5 0 B
+    echo -n "PERFORMANCE"
+    color 7 0 B
+    echo "- Runs the CPU(s) at maximum clock speed." 
+    echo
+    echo -n "The Active Governor is: "
+    color 4 0 B
+    echo "$policy"
+    color 7 0 B
+    echo
+    counter=0
+    while [[ counter -lt totopt ]] ; do
+      let counter=counter+1
+      color 2 0 B
+      echo -n "$counter) "
+      color 7 0 B
+      echo "${governs[$counter]}"
+    done
+    echo
+    color 7 1 B
+    echo -n " Enter the Selected Governor Number to use [1-$((totopt))] (q=Quit): "
+    color 7 0 B
+
+# Check for Input option menu Automation
+    
+    if [[ $1 -le $totopt ]] && [[ $1 -gt 0 ]] ; then
+      CHOICE=$1
+      shift
+    else
+      read -n1 CHOICE
+      echo ; echo
+    fi
+
+    if [[ $CHOICE =~ ^[0-9]+$ ]] ; then
+      if [[ $CHOICE -le $counter ]] && [[ $CHOICE -gt 0 ]]; then
+        govern_set "${governs[$CHOICE]}"
+
+# *****************************************************************************
+#         CPU Speed Selection when Governor is set to userspace 
+# *****************************************************************************
+
+        if [ "${governs[$CHOICE]}" == "userspace" ] ; then
+	  setfreq 1
+          header
+	  echo -n "           "
+	  color 7 4 B
+	  echo " CPU USERSPACE Speed Selection Menu "
+	  color 7 0 B
+	  echo
+	  counter=0
+	  while [[ counter -lt totspd ]] ; do
+	    let counter=counter+1
+	    color 5 0 B
+	    echo -n "                       $counter)"
+	    color 7 0 B
+	    echo " ${spdsteps[$counter]}"
+	  done
+          echo 
+          echo -n "       "
+          color 7 1 B
+	  echo -n " Enter the CPU Speed Number to use [1-$((totspd))]: "
+	  color 7 0 B
+
+# Check for Input option menu Automation
+	  
+	  if [[ $1 -le $totspd ]] && [[ $1 -gt 0 ]] ; then
+	    CHOICE=$1
+	    shift
+	  else
+	    read -n1 CHOICE
+	  fi
+	  if [[ $CHOICE =~ ^[0-9]+$ ]] ; then
+	    if [[ $CHOICE -le $counter ]] && [[ $CHOICE -gt 0 ]]; then
+	      setfreq "$CHOICE"
+            fi
+          fi
+        fi
+      fi
+    else 
+      gui=false
+    fi
+  fi
+    if [[ $CHOICE == [Qq] ]] ; then
+      gui=false
+    fi
+done
+
+# *****************************************************************************
+#                       Program is now complete
+# *****************************************************************************
+
+show_gpl
+speed
+
+exit 0
+# End Of Script
